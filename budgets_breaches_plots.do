@@ -558,7 +558,7 @@ restore
 } // end `acct'
 *========================================================================
 * PLOTS OF BUDGETS PRE- AND POST-BREACH
-local maxcov 1
+local maxcov 0
 if `pre_post' == 1 {
 *========================================================================
 * --- Group ID Level ----------------------------
@@ -569,7 +569,7 @@ if `maxcov' == 0 {
 		 (first) stn_conm, by(groupid year) fast
 }
 *-----------------------------------------------*
-		 
+		
 * --- Max Coverage Instead of Group ID Level ---*
 if `maxcov' == 1 {
 	use master_sitelevel_subset, clear
@@ -681,8 +681,6 @@ joinby groupid using `breaches_nodups', unmatched(master)
 drop if report_year <= 2010	
 gen t = year - report_year
 
-preserve
-
 local medians "(median) "
 local p25s "(p25) "
 local p75s "(p75) "
@@ -724,5 +722,98 @@ tw (line med_sh_hardware t, lc(dkorange) lp(l))
  `gov_actions';
 graph export "tbreach_sh_budget_items.png", replace as(png) wid(1200) hei(700);
 #delimit cr
+
+*========================================================================
+* PLOTS OF BUDGET GROWTH RATES PRE- AND POST-BREACH
+*========================================================================
+* --- Group ID Level ----------------------------
+if `maxcov' == 0 {
+	use master_clean_subset, clear
+
+	collapse (sum) it_budget n_sites n_computers ///
+		 (first) stn_conm, by(groupid year) fast
+}
+*-----------------------------------------------*
+		 
+* --- Max Coverage Instead of Group ID Level ---*
+if `maxcov' == 1 {
+	use ../master_sitelevel_subset, clear
+	bys siteid: egen n_yrs = count(year)
+	bys groupid: egen max_cov = max(n_yrs)
+	keep if n_yrs == max_cov
+		collapse (count) n_sites = siteid (sum) it_budget n_computer acct_sw, ///
+			by(groupid year)
+}
+*-----------------------------------------------*
+xtset groupid year
+gen g_it = (it_budget - l.it_budget)/l.it_budget * 100
+	lab var g_it "Growth rate of IT budget over previous year (%)"
+gen g_cpu = (n_computers - l.n_computers)/l.n_computers * 100
+	lab var g_cpu "Growth rate of number of computers over previous year (%)"
 	
+joinby groupid using `breaches_nodups', unmatched(master)
+drop if report_year <= 2010	
+gen t = year - report_year
+
+foreach var of varlist g_it g_cpu {
+if "`var'" == "g_it" {
+	local title "Growth Rate of IT Budgets"
+	local yt "Growth Rate over Previous Year (%)"
+}
+if "`var'" == "g_cpu" {
+	local title "Growth Rate of Number of Computers"
+	local yt "Growth Rate over Previous Year (%)"
+}
+
+
+	foreach lowp in 1 10 {
+		local highp = 100-`lowp'
+		preserve
+			#delimit ;
+			collapse (mean) mean_`var' = `var'
+					 (median) med_`var' = `var'
+					 (p`lowp') p`lowp'_`var' = `var'
+					 (p`highp') p`highp'_`var' = `var'
+					 (p25) p25_`var' = `var'
+					 (p75) p75_`var' = `var'
+					 (sd) sd_`var' = `var',
+				by(t) fast;
+
+			tw (line p25 t, lc(eltblue) lp(_)) (line p75 t, lc(eltblue) lp(_))
+			   (line mean t, lc(black) lp(l)) (line med t, lc(midblue) lp(l))
+			   (line p`lowp' t, lc(gs8) lp(-)) (line p`highp' t, lc(gs8) lp(-))
+			, legend(order(5 "Percentiles `lowp' & `highp'" 1 "Quartiles"
+						  3 "Mean" 4 "Median") r(2) colfirst)
+				ti("`title'" "Distribution by Group and Breach")
+				yti("`yt'") xti("Years Since Breach") xline(0, lc(gs12) lp(-));
+			graph export "tbreach_`var'_groupid`ext'_`lowp'_`highp'.png",
+								replace as(png) wid(1200) hei(700);
+			#delimit cr
+		restore
+	}
+
+preserve
+	winsor `var', gen(`var'_w) p(0.05) highonly
+
+	#delimit ;
+	collapse (mean) mean_`var' = `var'_w
+			 (median) med_`var' = `var'_w
+			 (p25) p25_`var' = `var'_w
+			 (p75) p75_`var' = `var'_w
+			 (sd) sd_`var' = `var'_w,
+		by(t) fast;
+
+	tw (line p25 t, lc(eltblue) lp(_)) (line p75 t, lc(eltblue) lp(_))
+	   (line mean t, lc(black) lp(l)) (line med t, lc(midblue) lp(l))
+	, legend(order(1 "Quartiles" 3 "Mean" 4 "Median") r(1) colfirst)
+		ti("`title'" "Distribution by Group and Breach")
+		subti("Winsorized 5%, Upper Tail Only")
+		yti("`yt'") xti("Years Since Breach") xline(0, lc(gs12) lp(-));
+	graph export "tbreach_`var'_groupid`ext'_25_75.png",
+						replace as(png) wid(1200) hei(700);
+	#delimit cr
+restore
+
+}
+
 } // end `pre_post'
