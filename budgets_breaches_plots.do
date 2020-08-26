@@ -15,7 +15,8 @@ global repo "C:\Users\lmostrom\Documents\GitHub\it_spending"
 local exports 0
 local plots 0
 local subsets 0
-local pre_post 1
+local pre_post 0
+local pre_post_byCpu 1
 
 
 local gov_actions "xline(2011.833 2013.167 2015.667 2015.833 2018.833, lc(gs12))"
@@ -196,8 +197,12 @@ cap mkdir "MaxCovSites"
 foreach lowp in 1 10 {
 	local highp = 100-`lowp'
 forval to2015 = 0/0 {
+forval byAT = 1/1 {
 	if `to2015' local ext "_to2015"
 	else local ext ""
+	
+	*if `byAT' local ext "`ext'_byAT"
+	
 		preserve
 			*if "`lev'" == "group" collapse (sum) it_budget, by(groupid year)
 			replace it_budget = it_budget / 1000000
@@ -260,6 +265,7 @@ forval to2015 = 0/0 {
 }
 
 restore 
+} // end byAT (total assets) loop
 } // end to2015 loop
 } // end 1% / 10% loop
 //---------------------------------------------------------------
@@ -589,6 +595,9 @@ joinby groupid using `breaches_nodups', unmatched(master)
 drop if report_year <= 2010	
 gen t = year - report_year
 
+merge 1:1 gvkey year using "../Compustat-CRSP_Merged_Annual.dta", nogen keep(1 3) ///
+		keepus(at sic revt xrd)
+
 foreach var of varlist it_budget n_computer {
 if "`var'" == "it_budget" {
 	local title "IT Budgets"
@@ -817,3 +826,16 @@ restore
 }
 
 } // end `pre_post'
+*========================================================================
+* PLOTS OF BUDGETS PRE- AND POST-BREACH
+local maxcov 0
+if `pre_post_byCpu' == 1 {
+*========================================================================
+
+
+
+
+
+
+} // end `pre_post_byCpu'
+*========================================================================
