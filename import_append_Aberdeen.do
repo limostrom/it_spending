@@ -5,9 +5,6 @@ import_append_Aberdeen.do
 **Must run on Grid with special request for extra RAM:
 bsub -q long int -n 4 -Ip -W 12:00 -R "rusage[mem=50000]" -M 50000 -hl xstata-mp4
 (50GB for 12 hours)
-
-**Note: text files must be moved before or after unzipping, and cannot all be
-saved in the same folder (not enough space)
 */
 pause on
 
@@ -21,8 +18,9 @@ local compinst 0
 local presinst 0
 local pls 0
 local techtot 0
+local businit 1
 local append_1819 0
-local merge 1
+local merge 0
 
 
 
@@ -295,6 +293,70 @@ foreach country in /*"USA"*/ "Canada" "EuropeHistory" {
 } // end country loop
 *----------------------
 } // `techtot' section
+*----------------------
+
+*--------------------
+if `businit' == 1 {
+*--------------------
+* Business Initiatives
+foreach country in "USA" /*"Canada" "EuropeHistory"*/ {
+	/*
+	forval y = 2014/2014 {
+		unzipfile "`country'_`y'.zip"
+		import delimited "Hist`y'_BUSINIT.txt", clear varn(1)
+		gen year = `y'
+		save "`country'`y'_businit.dta", replace
+		pause
+		drop _all
+		cd ../
+		local filelist: dir "IT_Spending" files "Hist`y'_*.txt"
+		cd IT_Spending
+		foreach file of local filelist {
+			rm "`file'"
+		}
+		pause
+	}
+	
+	forval y = 2018/2019 {
+		unzipfile "`country'_`y'.zip"
+		import delimited "BusinessInitiatives.TXT", clear varn(1)
+		cap ren ÿþsiteid siteid
+		gen year = `y'
+		save "`country'`y'_businit.dta", replace
+		pause
+		drop _all
+		cd ../
+		local filelist: dir "IT_Spending" files "*.TXT"
+		cd IT_Spending
+		foreach file of local filelist {
+			rm "`file'"
+		}
+		pause
+	}
+	
+	*-------------------------------------------------------------------
+	use "`country'2010_businit.dta", clear
+	forval y = 2011/2019 {
+		append using "`country'`y'_businit.dta", force
+	}
+	*===================================================================
+	order siteid year
+	sort siteid year
+
+	save "businit_`country'_2010_2019.dta", replace
+	*/
+
+} // end country loop
+
+use "master_merged.dta", clear
+	keep if country == "USA"
+	merge 1:1 siteid year using "businit_USA_2010_2019.dta", gen(_mbus)
+save "full_sitelevel_USA.dta", replace
+	include breach_subset.do
+save "breach_subset_sitelevel.dta", replace
+
+*----------------------
+} // `businit' section
 *----------------------
 *%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if `append_1819' == 1 {
